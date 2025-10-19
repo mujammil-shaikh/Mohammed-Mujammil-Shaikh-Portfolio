@@ -24,12 +24,22 @@ export const Chatbot: React.FC = () => {
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [chat, setChat] = useState<Chat | null>(null);
+  const [isInitialized, setIsInitialized] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (isOpen && !chat) {
+    if (isOpen && !isInitialized) {
+        setIsInitialized(true); // Attempt initialization only once per opening
+        const apiKey = process.env.API_KEY;
+
+        if (!apiKey) {
+            console.error("Gemini API key is missing. Please set it in your environment variables.");
+            setMessages([{ role: 'error', text: "Sorry, the AI assistant isn't configured correctly (missing API key)." }]);
+            return;
+        }
+
         try {
-            const ai = new GoogleGenAI({ apiKey: process.env.API_KEY as string });
+            const ai = new GoogleGenAI({ apiKey });
             const newChat = ai.chats.create({
                 model: 'gemini-2.5-flash',
                 config: {
@@ -52,7 +62,7 @@ export const Chatbot: React.FC = () => {
             setMessages([{ role: 'error', text: 'Sorry, the AI assistant could not be loaded.' }]);
         }
     }
-  }, [isOpen, chat]);
+  }, [isOpen, isInitialized]);
   
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -85,10 +95,21 @@ export const Chatbot: React.FC = () => {
     }
   };
 
+  const toggleOpen = () => {
+    const newState = !isOpen;
+    setIsOpen(newState);
+    if (!newState) {
+        // Reset state when closing
+        setIsInitialized(false);
+        setMessages([]);
+        setChat(null);
+    }
+  }
+
   return (
     <>
       <button
-        onClick={() => setIsOpen(!isOpen)}
+        onClick={toggleOpen}
         className="fixed bottom-6 left-6 z-50 w-16 h-16 bg-sky-600 dark:bg-sky-500 text-white rounded-full shadow-lg flex items-center justify-center hover:scale-110 transition-transform duration-300 animate-pulse"
         aria-label="Open AI chat"
       >
@@ -109,7 +130,7 @@ export const Chatbot: React.FC = () => {
                     <div className="w-3 h-3 bg-green-400 rounded-full"></div>
                     <h3 className="font-bold text-slate-800 dark:text-slate-200">AI Persona</h3>
                 </div>
-                <button onClick={() => setIsOpen(false)} className="text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200" aria-label="Close chat">
+                <button onClick={toggleOpen} className="text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200" aria-label="Close chat">
                     <XIcon className="w-6 h-6" />
                 </button>
             </header>
@@ -140,9 +161,9 @@ export const Chatbot: React.FC = () => {
                   onKeyPress={handleKeyPress}
                   placeholder="Ask me anything..."
                   className="flex-grow bg-transparent p-2 text-sm text-slate-800 dark:text-slate-200 placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none"
-                  disabled={isLoading}
+                  disabled={isLoading || !chat}
                 />
-                <button onClick={handleSend} disabled={isLoading || input.trim() === ''} className="p-2 text-sky-600 dark:text-sky-400 disabled:text-slate-400 dark:disabled:text-slate-600 hover:text-sky-500 dark:hover:text-sky-300 transition-colors duration-200">
+                <button onClick={handleSend} disabled={isLoading || input.trim() === '' || !chat} className="p-2 text-sky-600 dark:text-sky-400 disabled:text-slate-400 dark:disabled:text-slate-600 hover:text-sky-500 dark:hover:text-sky-300 transition-colors duration-200">
                   <PaperAirplaneIcon className="w-5 h-5" />
                 </button>
               </div>
